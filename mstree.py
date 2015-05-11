@@ -1,9 +1,7 @@
 import math
 import random
 import numpy as np
-import matplotlib.pyplot as plt
 import csv
-import pdb
 
 class Node:
 	def __init__(self, parent, pos, index, path_distance = 0.0):
@@ -46,18 +44,9 @@ def mstree(points, balancing_factor = 0.5, threshold = 50):
 
 	open_distance_list = distances.copy()[1:]
 	
-	# distance_matrix = np.zeros((length, length))
-	# for i in range(length):
-	# 	for j in range(0, i):
-	# 		dist_squared = np.sum(np.square(points[i] - points[j]))
-	# 		if dist_squared > threshold_squared:
-	# 			distance_matrix[i][j] = np.nan
-	# 		else:
-	# 			distance_matrix[i][j] = np.sqrt(dist_squared)
 	tthreshold = threshold
 
 	while len(open_distance_list) > 0:
-		print(len(open_distance_list))
 		minimum_index = np.argmin(open_distance_list)
 		minimum = open_distance_list[minimum_index]
 		point_index = open_list.pop(minimum_index)
@@ -86,31 +75,6 @@ def mstree(points, balancing_factor = 0.5, threshold = 50):
 				open_distance_list[open_index_index] = weighted_distance
 				closest_point_in_tree[open_index] = point_index
 
-	print(len(root_node.children))
-	pdb.set_trace()
 	return root_node
 
-def drawTree(root_node):
-	plt.figure()
-	plt.scatter(points[:,0], points[:,1])
-	drawTreeRecursive(root_node)
-	plt.show()
 
-def drawTreeRecursive(root_node):
-	for child in root_node.children:
-		print('Plotting from point ' + str(root_node.index) + ' to ' + str(child.index))
-		plt.plot((root_node.pos[0], child.pos[0]), (root_node.pos[1], child.pos[1]),'-')
-		drawTreeRecursive(child)
-
-
-if __name__ == '__main__':
-	points = np.random.rand(100,2) * 10 - 5
-	points[0] = (0,0)
-	# plt.scatter(points[:,0], points[:,1])
-	# plt.show()
-	f = open('testdata.csv', 'r')
-	reader = csv.reader(f, delimiter=";", quoting=csv.QUOTE_NONNUMERIC)
-	points = np.array([row for row in reader])
-	print(points)
-	root = mstree(points, threshold = 50)
-	drawTree(root)
