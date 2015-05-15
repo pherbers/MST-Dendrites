@@ -70,18 +70,17 @@ class CreateMST(bpy.types.Operator):
             particle_points = [(x.location[0], x.location[1], x.location[2]) for x in particle_system.particles]
             if self.root_data_type == 'OBJECT':
                 root_point = bpy.data.objects[self.root_data_object].location
-                print(root_point)
-                print([(root_point[0], root_point[1], root_point[2])].extend(particle_points) )
-                points = np.array([(root_point[0], root_point[1], root_point[2])].extend(particle_points))
+                root_list = [(root_point[0], root_point[1], root_point[2])]
+                root_list.extend(particle_points)
+                points = np.array(root_list)
             elif self.root_data_type == 'CURSOR':
                 root_point = bpy.context.scene.cursor_location
-                print(root_point)
-                print(particle_points)
-                points = np.array([(root_point[0], root_point[1], root_point[2])].extend(particle_points))
+                root_list = [(root_point[0], root_point[1], root_point[2])]
+                root_list.extend(particle_points)
+                points = np.array(root_list)
             else:
                 points = np.array(particle_points)
 
-            print(points)
             root_node = mstree.mstree(points, balancing_factor = self.balancing_factor)
             
             buildTree(root_node)
