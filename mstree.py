@@ -68,12 +68,20 @@ def mstree(points, balancing_factor = 0.5, threshold = 50):
 
 		tthreshold = max(tthreshold, threshold + distances[point_index])
 
-		for open_index_index, open_index in enumerate(open_list):
-			dis = open_distance_list[open_index_index]
-			weighted_distance = np.sqrt(np.sum(np.square(points[open_index] - location))) + balancing_factor * path_distance
-			if dis > weighted_distance:
-				open_distance_list[open_index_index] = weighted_distance
-				closest_point_in_tree[open_index] = point_index
+		open_points = points[open_list]
+		weighted_distance = np.sqrt(np.sum(np.square(np.subtract(open_points, location)), axis = 1)) + balancing_factor * path_distance
+		open_distance_list_indeces = np.argmin(np.column_stack((open_distance_list, weighted_distance)), axis = 1)
+		open_distance_list = np.minimum(open_distance_list, weighted_distance)
+		changed_values = np.zeros(len(closest_point_in_tree), dtype = np.bool)
+		changed_values.put(open_list, open_distance_list_indeces)
+		closest_point_in_tree = np.where(changed_values == 1, point_index, closest_point_in_tree)
+
+		# for open_index_index, open_index in enumerate(open_list):
+		# 	dis = open_distance_list[open_index_index]
+		# 	weighted_distance = np.sqrt(np.sum(np.square(points[open_index] - location))) + balancing_factor * path_distance
+		# 	if dis > weighted_distance:
+		# 		open_distance_list[open_index_index] = weighted_distance
+		# 		closest_point_in_tree[open_index] = point_index
 
 	return root_node
 
