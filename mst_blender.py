@@ -1,6 +1,7 @@
 import mstree
 import bpy
 import numpy as np
+import mathutils
 
 bl_info = {
     "name": "Minumum Spanning Tree",
@@ -9,19 +10,20 @@ bl_info = {
     "author": "Patrick Herbers"
 }
 
-def buildTreeRecursive(root_node, vertex_index, vertices, edges):
-    for child in root_node.children:
-        vertices.append(child.pos)
-        edges.append([vertex_index, len(vertices) - 1])
-        buildTreeRecursive(child, len(vertices) - 1, vertices, edges)
+def buildTreeMesh(root_node):
 
-def buildTree(root_node):
+    def buildTreeMeshRecursive(root_node, vertex_index, vertices, edges):
+        for child in root_node.children:
+            vertices.append(child.pos)
+            edges.append([vertex_index, len(vertices) - 1])
+            buildTreeRecursive(child, len(vertices) - 1, vertices, edges)
+
     vertices = [root_node.pos]
     edges = []
     for child in root_node.children:
         vertices.append(child.pos)
         edges.append([0, len(vertices) - 1])
-        buildTreeRecursive(child, len(vertices) - 1, vertices, edges)
+        buildTreeMeshRecursive(child, len(vertices) - 1, vertices, edges)
 
     mesh = bpy.data.meshes.new("Tree")
     mesh.from_pydata(vertices, edges, [])
@@ -30,11 +32,36 @@ def buildTree(root_node):
     obj = bpy.data.objects.new("Tree", mesh)
     bpy.context.scene.objects.link(obj)
 
+def buildTreeCurve(root_node):
 
-class CreateMST(bpy.types.Operator):
-    bl_idname = "object.create_mst"
-    bl_label = "Create MST"
+    def buildTreeCurveRecursive(root_node, curve, spline):
+        if len(spline.bezier_points) > 2:
+            spline.bezier_points.add()
+        point = spline.bezier_points[-1]
+        point.co = mathutils.Vector(root_node.pos)
 
+        if len(root_node.children) > 0:
+            buildTreeCurveRecursive(root_node.children[0], curve, spline)
+
+        if len(root_node.children) > 1:
+            for child in root_node.children[1:]:
+                branch = curve.splines.new('BEZIER')
+                point = branch.bezier_points[0]
+                point.co = mathutils.Vector(root_node.pos)
+
+                buildTreeCurveRecursive(child, curve, branch)
+
+    curve = bpy.data.curves.new('Tree', 'CURVE')
+    curve.dimensions = '3D'
+    spline = curve.splines.new('BEZIER')
+
+    buildTreeCurveRecursive(root_node, curve, spline)
+
+    curve_object = bpy.data.objects.new("Tree", curve)
+    bpy.context.scene.objects.link(curve_object)
+
+
+class MSTProperties(bpy.types.PropertyGroup):
     balancing_factor = bpy.props.FloatProperty(name = "Balancing factor", default = 0.5, min = 0.0, max = 1.0)
 
     threshold = bpy.props.FloatProperty(name = "Threshold", default = 50)
@@ -63,17 +90,68 @@ class CreateMST(bpy.types.Operator):
 
     root_data_object = bpy.props.StringProperty(name = "Root object")
 
+    build_type = bpy.props.EnumProperty(
+        name = "Build type",
+        items = (
+            ('MESH', 'Mesh', 'Build the tree out of vertices'),
+            ('CURVE', 'Curve', 'Build the tree out of curves')
+        ),
+        default = 'MESH'
+    )
+
+class MSTPanel(bpy.types.Panel):
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "TOOLS"
+    bl_context = "objectmode"
+    bl_label = "Minimum Spanning Tree"
+    bl_category = "Tools"
+
+    def draw(self, context):
+        op = context.scene.mst_options
+
+        layout = self.layout
+
+        row = layout.row()
+        row.prop(op, "balancing_factor")
+        
+        row = layout.row()
+        row.prop(op, "point_data_type")
+        row = layout.row()
+        row.prop_search(op, "source_object", bpy.data, 'objects')
+        row = layout.row()
+        if op.source_object in bpy.data.objects:
+            row.prop_search(op, "source_particle_system", bpy.data.objects[op.source_object], 'particle_systems')
+
+        row = layout.row()
+        row.prop(op, "root_data_type")
+
+        if op.root_data_type == 'OBJECT':
+            row = layout.row()
+            row.prop_search(op, "root_data_object", bpy.data, 'objects')
+
+        row = layout.row()
+        row.prop(op, "build_type")
+
+        row = layout.row()
+        row.operator("object.create_mst")
+
+class CreateMST(bpy.types.Operator):
+    bl_idname = "object.create_mst"
+    bl_label = "Create MST"
+
     def execute(self, context):
         print("Creating MST")
-        if self.point_data_type == 'PARTICLE':
-            particle_system = bpy.data.objects[self.source_object].particle_systems[0]
+        options = context.scene.mst_options
+
+        if options.point_data_type == 'PARTICLE':
+            particle_system = bpy.data.objects[options.source_object].particle_systems[0]
             particle_points = [(x.location[0], x.location[1], x.location[2]) for x in particle_system.particles]
-            if self.root_data_type == 'OBJECT':
-                root_point = bpy.data.objects[self.root_data_object].location
+            if options.root_data_type == 'OBJECT':
+                root_point = bpy.data.objects[options.root_data_object].location
                 root_list = [(root_point[0], root_point[1], root_point[2])]
                 root_list.extend(particle_points)
                 points = np.array(root_list)
-            elif self.root_data_type == 'CURSOR':
+            elif options.root_data_type == 'CURSOR':
                 root_point = bpy.context.scene.cursor_location
                 root_list = [(root_point[0], root_point[1], root_point[2])]
                 root_list.extend(particle_points)
@@ -81,48 +159,37 @@ class CreateMST(bpy.types.Operator):
             else:
                 points = np.array(particle_points)
 
-            root_node = mstree.mstree(points, balancing_factor = self.balancing_factor)
-            
-            buildTree(root_node)
+        root_node = mstree.mstree(points, balancing_factor = options.balancing_factor)
 
+        if options.build_type == 'MESH':
+            buildTreeMesh(root_node)
+        elif options.build_type == 'CURVE':
+            buildTreeCurve(root_node)
+        
         return {'FINISHED'}
 
-    def invoke(self, context, event):
-        active_object = bpy.context.scene.objects.active
-        if active_object:
-            self.source_object = active_object.name
-            self.root_data_object = active_object.name
-            if len(active_object.particle_systems) > 0:
-                self.source_particle_system = active_object.particle_systems[0].name
-        wm = context.window_manager
-        return wm.invoke_props_dialog(self)
+    # def invoke(self, context, event):
+    #     active_object = bpy.context.scene.objects.active
+    #     if active_object:
+    #         self.source_object = active_object.name
+    #         self.root_data_object = active_object.name
+    #         if len(active_object.particle_systems) > 0:
+    #             self.source_particle_system = active_object.particle_systems[0].name
+    #     wm = context.window_manager
+    #     return wm.invoke_props_dialog(self)
 
-    def draw(self, context):
-        layout = self.layout
-
-        row = layout.row()
-        row.prop(self, "balancing_factor")
-        
-        row = layout.row()
-        row.prop(self, "point_data_type")
-        row = layout.row()
-        row.prop_search(self, "source_object", bpy.data, 'objects')
-        row = layout.row()
-        if self.source_object in bpy.data.objects:
-            row.prop_search(self, "source_particle_system", bpy.data.objects[self.source_object], 'particle_systems')
-
-        row = layout.row()
-        row.prop(self, "root_data_type")
-
-        if self.root_data_type == 'OBJECT':
-            row = layout.row()
-            row.prop(self, "root_data_object")
 
 def register():
+    bpy.utils.register_class(MSTProperties)
+    bpy.types.Scene.mst_options = bpy.props.PointerProperty(type=MSTProperties)
     bpy.utils.register_class(CreateMST)
+    bpy.utils.register_class(MSTPanel)
 
 def unregister():
+    bpy.utils.unregister_class(MSTProperties)
+    del bpy.types.Scene.mst_options
     bpy.utils.unregister_class(CreateMST)
+    bpy.utils.unregister_class(MSTPanel)
 
 if __name__ == '__main__':
     register()
