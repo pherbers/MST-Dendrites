@@ -35,10 +35,12 @@ def buildTreeMesh(root_node):
 def buildTreeCurve(root_node):
 
     def buildTreeCurveRecursive(root_node, curve, spline):
-        if len(spline.bezier_points) > 2:
-            spline.bezier_points.add()
+        spline.bezier_points.add()
+        point_index = len(spline.bezier_points) - 1
         point = spline.bezier_points[-1]
         point.co = mathutils.Vector(root_node.pos)
+        point.handle_left_type = 'AUTO'
+        point.handle_right_type = 'AUTO'
 
         if len(root_node.children) > 0:
             buildTreeCurveRecursive(root_node.children[0], curve, spline)
@@ -46,16 +48,26 @@ def buildTreeCurve(root_node):
         if len(root_node.children) > 1:
             for child in root_node.children[1:]:
                 branch = curve.splines.new('BEZIER')
-                point = branch.bezier_points[0]
-                point.co = mathutils.Vector(root_node.pos)
+                point_branch = branch.bezier_points[0]
+                point_branch.co = mathutils.Vector(root_node.pos)
 
                 buildTreeCurveRecursive(child, curve, branch)
+                branch.bezier_points[0].handle_right_type = 'VECTOR'
+                branch.bezier_points[0].handle_left_type = 'VECTOR'
+            spline.bezier_points[point_index].handle_right_type = 'VECTOR'
+            spline.bezier_points[point_index].handle_left_type = 'VECTOR'
 
     curve = bpy.data.curves.new('Tree', 'CURVE')
     curve.dimensions = '3D'
-    spline = curve.splines.new('BEZIER')
+    
+    for child in root_node.children:
+        branch = curve.splines.new('BEZIER')
+        point = branch.bezier_points[0]
+        point.co = mathutils.Vector(root_node.pos)
 
-    buildTreeCurveRecursive(root_node, curve, spline)
+        buildTreeCurveRecursive(child, curve, branch)
+        branch.bezier_points[0].handle_right_type = 'VECTOR'
+        branch.bezier_points[0].handle_left_type = 'VECTOR'
 
     curve_object = bpy.data.objects.new("Tree", curve)
     bpy.context.scene.objects.link(curve_object)
