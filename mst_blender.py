@@ -2,6 +2,8 @@ import mstree
 import bpy
 import numpy as np
 import mathutils
+import math
+import random
 
 bl_info = {
     "name": "Minumum Spanning Tree",
@@ -16,7 +18,7 @@ def buildTreeMesh(root_node):
         for child in root_node.children:
             vertices.append(child.pos)
             edges.append([vertex_index, len(vertices) - 1])
-            buildTreeRecursive(child, len(vertices) - 1, vertices, edges)
+            buildTreeMeshRecursive(child, len(vertices) - 1, vertices, edges)
 
     vertices = [root_node.pos]
     edges = []
@@ -72,6 +74,28 @@ def buildTreeCurve(root_node):
     curve_object = bpy.data.objects.new("Tree", curve)
     bpy.context.scene.objects.link(curve_object)
 
+def spinPoints(points, axis, axis_direction, radians = math.pi, seed = None):
+    rng = random.Random()
+    rng.seed(seed)
+
+    dir_n = axis_direction / np.linalg.norm(axis_direction)
+    a = axis[0]; b = axis[1]; c = axis[2]
+    u = dir_n[0]; v = dir_n[1]; w = dir_n[2]
+
+    new_points = []
+
+    # Formula: http://inside.mines.edu/fs_home/gmurray/ArbitraryAxisRotation/
+
+    for point in points:
+        rotation = rng.random() * radians
+        x = point[0]; y = point[1]; z = point[2]
+        v1 = (a*(v**2 + w**2) - u*(b*v + c*w - u*x - v*y - w*z)) * (1 - np.cos(rotation)) + x*np.cos(rotation) + (-c*v+b*w-w*y+v*z) * np.sin(rotation)
+        v2 = (b*(u**2 + w**2) - v*(a*u + c*w - u*x - v*y - w*z)) * (1 - np.cos(rotation)) + y*np.cos(rotation) + (c*u-a*w+w*x+u*z) * np.sin(rotation)
+        v3 = (c*(u**2 + v**2) - w*(a*u + b*v - u*x - v*y - w*z)) * (1 - np.cos(rotation)) + z*np.cos(rotation) + (-b*u+a*v-v*x+u*y) * np.sin(rotation)
+        new_points.append((v1,v2,v3))
+
+    return np.array(new_points)
+
 
 class MSTProperties(bpy.types.PropertyGroup):
     balancing_factor = bpy.props.FloatProperty(name = "Balancing factor", default = 0.5, min = 0.0, max = 1.0)
@@ -111,6 +135,11 @@ class MSTProperties(bpy.types.PropertyGroup):
         default = 'MESH'
     )
 
+    random_spin = bpy.props.BoolProperty(name = "Random spin", default = False)
+    spin_object = bpy.props.StringProperty(name = "Axis object")
+    spin_degrees = bpy.props.FloatProperty(name = "Spin degrees", subtype = 'ANGLE', min = 0.0, max = 2*math.pi, default = math.pi)
+    spin_axis = bpy.props.EnumProperty(name = "Spin axis", items = (('X', 'X', 'Spin along the X-axis of the object'), ('Y', 'Y', 'Spin along the Y-axis of the object'), ('Z', 'Z', 'Spin along the Z-axis of the object')), default = 'Y')
+
 class MSTPanel(bpy.types.Panel):
     bl_space_type = "VIEW_3D"
     bl_region_type = "TOOLS"
@@ -145,6 +174,19 @@ class MSTPanel(bpy.types.Panel):
         row.prop(op, "build_type")
 
         row = layout.row()
+        row.prop(op, "random_spin")
+
+        if op.random_spin:
+            row = layout.row()
+            row.prop_search(op, "spin_object", bpy.data, 'objects')
+
+            row = layout.row()
+            row.prop(op, "spin_degrees")
+
+            row = layout.row()
+            row.prop(op, "spin_axis")
+
+        row = layout.row()
         row.operator("object.create_mst")
 
 class CreateMST(bpy.types.Operator):
@@ -171,6 +213,17 @@ class CreateMST(bpy.types.Operator):
             else:
                 points = np.array(particle_points)
 
+        if options.random_spin:
+            location = bpy.data.objects[options.spin_object].location
+            axis = bpy.data.objects[options.spin_object].rotation_quaternion.axis
+
+            if options.spin_axis == 'Y':
+                axis.rotate(mathutils.Matrix.Rotation(math.pi / 2, 4, 'Z'))
+            elif options.spin_axis == 'Z':
+                axis.rotate(mathutils.Matrix.Rotation(math.pi / 2, 4, 'Y'))
+
+            points = spinPoints(points, np.array(location), np.array(axis))
+
         root_node = mstree.mstree(points, balancing_factor = options.balancing_factor)
 
         if options.build_type == 'MESH':
@@ -179,17 +232,6 @@ class CreateMST(bpy.types.Operator):
             buildTreeCurve(root_node)
         
         return {'FINISHED'}
-
-    # def invoke(self, context, event):
-    #     active_object = bpy.context.scene.objects.active
-    #     if active_object:
-    #         self.source_object = active_object.name
-    #         self.root_data_object = active_object.name
-    #         if len(active_object.particle_systems) > 0:
-    #             self.source_particle_system = active_object.particle_systems[0].name
-    #     wm = context.window_manager
-    #     return wm.invoke_props_dialog(self)
-
 
 def register():
     bpy.utils.register_class(MSTProperties)
