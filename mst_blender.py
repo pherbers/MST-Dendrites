@@ -33,6 +33,7 @@ def buildTreeMesh(root_node):
 
     obj = bpy.data.objects.new("Tree", mesh)
     bpy.context.scene.objects.link(obj)
+    return obj
 
 def buildTreeCurve(root_node):
 
@@ -74,6 +75,8 @@ def buildTreeCurve(root_node):
     curve_object = bpy.data.objects.new("Tree", curve)
     bpy.context.scene.objects.link(curve_object)
 
+    return curve_object
+
 def spinPoints(points, axis, axis_direction, radians = math.pi, seed = None):
     rng = random.Random()
     rng.seed(seed)
@@ -96,6 +99,77 @@ def spinPoints(points, axis, axis_direction, radians = math.pi, seed = None):
 
     return np.array(new_points)
 
+def createTreeObject(options = None):
+    if options is None:
+        options = bpy.context.scene.mst_options
+
+    source_object = bpy.data.objects[options.source_object]
+
+    if options.point_data_type == 'PARTICLE':
+        particle_system = source_object.particle_systems[0]
+        particle_points = [(x.location[0], x.location[1], x.location[2]) for x in particle_system.particles]
+        if options.root_data_type == 'OBJECT':
+            root_point = bpy.data.objects[options.root_data_object].location
+            root_list = [(root_point[0], root_point[1], root_point[2])]
+            root_list.extend(particle_points)
+            points = np.array(root_list)
+        elif options.root_data_type == 'CURSOR':
+            root_point = bpy.context.scene.cursor_location
+            root_list = [(root_point[0], root_point[1], root_point[2])]
+            root_list.extend(particle_points)
+            points = np.array(root_list)
+        else:
+            points = np.array(particle_points)
+
+    if options.random_spin:
+        location = bpy.data.objects[options.spin_object].location
+        axis = bpy.data.objects[options.spin_object].rotation_quaternion.axis
+
+        if options.spin_axis == 'Y':
+            axis.rotate(mathutils.Matrix.Rotation(math.pi / 2, 4, 'Z'))
+        elif options.spin_axis == 'Z':
+            axis.rotate(mathutils.Matrix.Rotation(math.pi / 2, 4, 'Y'))
+
+        points = spinPoints(points, np.array(location), np.array(axis))
+
+    root_node = mstree.mstree(points, balancing_factor = options.balancing_factor)
+
+    if options.build_type == 'MESH':
+        obj = buildTreeMesh(root_node)
+    elif options.build_type == 'CURVE':
+        obj = buildTreeCurve(root_node)
+
+    return obj
+
+def createMultipleTrees(points, normals, options = None):
+    if normals is not None:
+        if len(points) != len(normals):
+            raise ValueError("Points and normals need to be the same length")
+
+    if options is None:
+        options = bpy.context.scene.mst_options
+
+    particle_system = bpy.data.objects[options.source_object].particle_systems[options.source_particle_system]
+    intial_seed = particle_system.seed
+
+    for i, point in enumerate(points):
+        if normals is not None:
+            normal = normals[i]
+        else:
+            normal = (0,0,1)
+
+        particle_system.seed = intial_seed + i
+
+        # Update the scene so the particle system gets updated
+        bpy.context.scene.update()
+
+        obj = createTreeObject(options)
+
+        obj.location = mathutils.Vector(point)
+
+        # obj.rotation = 
+
+    particle_system.seed = intial_seed
 
 class MSTProperties(bpy.types.PropertyGroup):
     balancing_factor = bpy.props.FloatProperty(name = "Balancing factor", default = 0.5, min = 0.0, max = 1.0)
@@ -139,6 +213,9 @@ class MSTProperties(bpy.types.PropertyGroup):
     spin_object = bpy.props.StringProperty(name = "Axis object")
     spin_degrees = bpy.props.FloatProperty(name = "Spin degrees", subtype = 'ANGLE', min = 0.0, max = 2*math.pi, default = math.pi)
     spin_axis = bpy.props.EnumProperty(name = "Spin axis", items = (('X', 'X', 'Spin along the X-axis of the object'), ('Y', 'Y', 'Spin along the Y-axis of the object'), ('Z', 'Z', 'Spin along the Z-axis of the object')), default = 'Y')
+
+    target_object = bpy.props.StringProperty(name = "Target object")
+    target_particle_system = bpy.props.StringProperty(name = "Target particle system")
 
 class MSTPanel(bpy.types.Panel):
     bl_space_type = "VIEW_3D"
@@ -189,6 +266,29 @@ class MSTPanel(bpy.types.Panel):
         row = layout.row()
         row.operator("object.create_mst")
 
+class DendritePanel(bpy.types.Panel):
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "TOOLS"
+    bl_context = "objectmode"
+    bl_label = "Create dendrite"
+    bl_category = "Tools"
+
+    def draw(self, context):
+        op = context.scene.mst_options
+
+        layout = self.layout
+
+        row = layout.row()
+        row.prop_search(op, "target_object", bpy.data, "objects")
+
+        if op.target_object in bpy.data.objects:
+            row = layout.row()
+            row.prop_search(op, "target_particle_system", bpy.data.objects[op.target_object], "particle_systems")
+
+        row = layout.row()
+        row.operator("object.create_dendrites")
+
+
 class CreateMST(bpy.types.Operator):
     bl_idname = "object.create_mst"
     bl_label = "Create MST"
@@ -196,54 +296,39 @@ class CreateMST(bpy.types.Operator):
     def execute(self, context):
         print("Creating MST")
         options = context.scene.mst_options
-
-        if options.point_data_type == 'PARTICLE':
-            particle_system = bpy.data.objects[options.source_object].particle_systems[0]
-            particle_points = [(x.location[0], x.location[1], x.location[2]) for x in particle_system.particles]
-            if options.root_data_type == 'OBJECT':
-                root_point = bpy.data.objects[options.root_data_object].location
-                root_list = [(root_point[0], root_point[1], root_point[2])]
-                root_list.extend(particle_points)
-                points = np.array(root_list)
-            elif options.root_data_type == 'CURSOR':
-                root_point = bpy.context.scene.cursor_location
-                root_list = [(root_point[0], root_point[1], root_point[2])]
-                root_list.extend(particle_points)
-                points = np.array(root_list)
-            else:
-                points = np.array(particle_points)
-
-        if options.random_spin:
-            location = bpy.data.objects[options.spin_object].location
-            axis = bpy.data.objects[options.spin_object].rotation_quaternion.axis
-
-            if options.spin_axis == 'Y':
-                axis.rotate(mathutils.Matrix.Rotation(math.pi / 2, 4, 'Z'))
-            elif options.spin_axis == 'Z':
-                axis.rotate(mathutils.Matrix.Rotation(math.pi / 2, 4, 'Y'))
-
-            points = spinPoints(points, np.array(location), np.array(axis))
-
-        root_node = mstree.mstree(points, balancing_factor = options.balancing_factor)
-
-        if options.build_type == 'MESH':
-            buildTreeMesh(root_node)
-        elif options.build_type == 'CURVE':
-            buildTreeCurve(root_node)
         
+        createTreeObject(options)
+
         return {'FINISHED'}
+
+class CreateDendrites(bpy.types.Operator):
+    bl_idname = "object.create_dendrites"
+    bl_label = "Create dendrites"
+
+    def execute(self, context):
+        options = context.scene.mst_options
+
+        particle_system = bpy.data.objects[options.target_object].particle_systems[options.target_particle_system]
+
+        points = [(x.location[0], x.location[1], x.location[2]) for x in particle_system.particles]
+
+        createMultipleTrees(points, None, options)
 
 def register():
     bpy.utils.register_class(MSTProperties)
     bpy.types.Scene.mst_options = bpy.props.PointerProperty(type=MSTProperties)
     bpy.utils.register_class(CreateMST)
     bpy.utils.register_class(MSTPanel)
+    bpy.utils.register_class(CreateDendrites)
+    bpy.utils.register_class(DendritePanel)
 
 def unregister():
     bpy.utils.unregister_class(MSTProperties)
     del bpy.types.Scene.mst_options
     bpy.utils.unregister_class(CreateMST)
     bpy.utils.unregister_class(MSTPanel)
+    bpy.utils.unregister_class(CreateDendrites)
+    bpy.utils.unregister_class(DendritePanel)
 
 if __name__ == '__main__':
     register()
