@@ -160,6 +160,3 @@ def add_quad_diameter(root_node, scale = 0.5, offset = 0.5):
 	for node in nodes:
 		node.thickness = sum(node.temp_t) / len(node.temp_t)
 		del node.temp_t
-
-	import pdb
-	pdb.set_trace()

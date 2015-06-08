@@ -44,6 +44,8 @@ def buildTreeCurve(root_node):
         point.co = mathutils.Vector(root_node.pos)
         point.handle_left_type = 'AUTO'
         point.handle_right_type = 'AUTO'
+        if hasattr(root_node, 'thickness'):
+            point.radius = root_node.thickness
 
         if len(root_node.children) > 0:
             buildTreeCurveRecursive(root_node.children[0], curve, spline)
@@ -57,6 +59,9 @@ def buildTreeCurve(root_node):
                 buildTreeCurveRecursive(child, curve, branch)
                 branch.bezier_points[0].handle_right_type = 'VECTOR'
                 branch.bezier_points[0].handle_left_type = 'VECTOR'
+                if hasattr(root_node, 'thickness'):
+                    branch.bezier_points[0].radius = root_node.thickness
+
             spline.bezier_points[point_index].handle_right_type = 'VECTOR'
             spline.bezier_points[point_index].handle_left_type = 'VECTOR'
 
@@ -133,6 +138,8 @@ def createTreeObject(options = None):
         points = spinPoints(points, np.array(location), np.array(axis))
 
     root_node = mstree.mstree(points, balancing_factor = options.balancing_factor)
+
+    mstree.add_quad_diameter(root_node)
 
     if options.build_type == 'MESH':
         obj = buildTreeMesh(root_node)
