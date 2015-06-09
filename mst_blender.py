@@ -174,7 +174,8 @@ def createMultipleTrees(points, normals, options = None):
 
         obj.location = mathutils.Vector(point)
 
-        # obj.rotation = 
+        obj.rotation_mode = 'QUATERNION'
+        obj.rotation_quaternion = mathutils.Vector(normal).to_track_quat('Z', 'Y')
 
     particle_system.seed = intial_seed
 
@@ -319,7 +320,12 @@ class CreateDendrites(bpy.types.Operator):
 
         points = [(x.location[0], x.location[1], x.location[2]) for x in particle_system.particles]
 
-        createMultipleTrees(points, None, options)
+        normals = [bpy.data.objects[options.target_object].closest_point_on_mesh(x.location)[1] for x in particle_system.particles]
+        print(normals)
+
+        createMultipleTrees(points, normals, options)
+
+        return {'FINISHED'}
 
 def register():
     bpy.utils.register_class(MSTProperties)
