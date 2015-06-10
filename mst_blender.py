@@ -139,7 +139,7 @@ def createTreeObject(options = None):
 
     root_node = mstree.mstree(points, balancing_factor = options.balancing_factor)
 
-    mstree.add_quad_diameter(root_node)
+    mstree.add_quad_diameter(root_node, path_scale = 100)
 
     if options.build_type == 'MESH':
         obj = buildTreeMesh(root_node)
