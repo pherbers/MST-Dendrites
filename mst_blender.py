@@ -76,9 +76,14 @@ def buildTreeCurve(root_node):
         buildTreeCurveRecursive(child, curve, branch)
         branch.bezier_points[0].handle_right_type = 'VECTOR'
         branch.bezier_points[0].handle_left_type = 'VECTOR'
+        if hasattr(root_node, 'thickness'):
+            branch.bezier_points[0].radius = root_node.thickness
 
     curve_object = bpy.data.objects.new("Tree", curve)
     bpy.context.scene.objects.link(curve_object)
+
+    curve.fill_mode = 'FULL'
+    curve.bevel_depth = 0.005
 
     return curve_object
 
@@ -97,9 +102,9 @@ def spinPoints(points, axis, axis_direction, radians = math.pi, seed = None):
     for point in points:
         rotation = rng.random() * radians
         x = point[0]; y = point[1]; z = point[2]
-        v1 = (a*(v**2 + w**2) - u*(b*v + c*w - u*x - v*y - w*z)) * (1 - np.cos(rotation)) + x*np.cos(rotation) + (-c*v+b*w-w*y+v*z) * np.sin(rotation)
-        v2 = (b*(u**2 + w**2) - v*(a*u + c*w - u*x - v*y - w*z)) * (1 - np.cos(rotation)) + y*np.cos(rotation) + (c*u-a*w+w*x+u*z) * np.sin(rotation)
-        v3 = (c*(u**2 + v**2) - w*(a*u + b*v - u*x - v*y - w*z)) * (1 - np.cos(rotation)) + z*np.cos(rotation) + (-b*u+a*v-v*x+u*y) * np.sin(rotation)
+        v1 = (a*(v**2 + w**2) - u*(b*v + c*w - u*x - v*y - w*z)) * (1 - np.cos(rotation)) + x*np.cos(rotation) + (-c*v + b*w - w*y + v*z) * np.sin(rotation)
+        v2 = (b*(u**2 + w**2) - v*(a*u + c*w - u*x - v*y - w*z)) * (1 - np.cos(rotation)) + y*np.cos(rotation) + ( c*u - a*w + w*x - u*z) * np.sin(rotation)
+        v3 = (c*(u**2 + v**2) - w*(a*u + b*v - u*x - v*y - w*z)) * (1 - np.cos(rotation)) + z*np.cos(rotation) + (-b*u + a*v - v*x + u*y) * np.sin(rotation)
         new_points.append((v1,v2,v3))
 
     return np.array(new_points)
@@ -108,43 +113,57 @@ def createTreeObject(options = None):
     if options is None:
         options = bpy.context.scene.mst_options
 
-    source_object = bpy.data.objects[options.source_object]
-
+    # Determine from where to take points
     if options.point_data_type == 'PARTICLE':
+        source_object = bpy.data.objects[options.source_object]
         particle_system = source_object.particle_systems[0]
         particle_points = [(x.location[0], x.location[1], x.location[2]) for x in particle_system.particles]
-        if options.root_data_type == 'OBJECT':
-            root_point = bpy.data.objects[options.root_data_object].location
-            root_list = [(root_point[0], root_point[1], root_point[2])]
-            root_list.extend(particle_points)
-            points = np.array(root_list)
-        elif options.root_data_type == 'CURSOR':
-            root_point = bpy.context.scene.cursor_location
-            root_list = [(root_point[0], root_point[1], root_point[2])]
-            root_list.extend(particle_points)
-            points = np.array(root_list)
-        else:
-            points = np.array(particle_points)
+    elif options.point_data_type == 'GROUP':
+        source_group = bpy.data.groups[options.source_group]
+        particle_points = [(x.location[0], x.location[1], x.location[2]) for x in source_group.objects]
+        
+    # Get starting point from object, cursor or first particle and create numpy array from it
+    if options.root_data_type == 'OBJECT':
+        root_point = bpy.data.objects[options.root_data_object].location
+        root_list = [(root_point[0], root_point[1], root_point[2])]
+        root_list.extend(particle_points)
+        points = np.array(root_list) - root_point
+    elif options.root_data_type == 'CURSOR':
+        root_point = bpy.context.scene.cursor_location
+        root_list = [(root_point[0], root_point[1], root_point[2])]
+        root_list.extend(particle_points)
+        points = np.array(root_list) - root_point
+    else:
+        root_point = particle_points[0]
+        points = np.array(particle_points) - root_point
 
+    # Spin points randomly on an axis if enabled
     if options.random_spin:
-        location = bpy.data.objects[options.spin_object].location
-        axis = bpy.data.objects[options.spin_object].rotation_quaternion.axis
-
         if options.spin_axis == 'Y':
-            axis.rotate(mathutils.Matrix.Rotation(math.pi / 2, 4, 'Z'))
+            up_axis = mathutils.Vector((0.0, 1.0, 0.0))
         elif options.spin_axis == 'Z':
-            axis.rotate(mathutils.Matrix.Rotation(math.pi / 2, 4, 'Y'))
+            up_axis = mathutils.Vector((0.0, 0.0, 1.0))
+        else:
+            up_axis = mathutils.Vector((1.0, 0.0, 0.0))
+
+        axis = bpy.data.objects[options.spin_object].rotation_euler.to_matrix() * up_axis
+        location = bpy.data.objects[options.spin_object].location - root_point
 
         points = spinPoints(points, np.array(location), np.array(axis))
 
+    # Create the tree structure
     root_node = mstree.mstree(points, balancing_factor = options.balancing_factor)
 
+    # Calculate the diameter of the tree
     mstree.add_quad_diameter(root_node, path_scale = 100)
 
+    # Build the blender object from the tree data
     if options.build_type == 'MESH':
         obj = buildTreeMesh(root_node)
     elif options.build_type == 'CURVE':
         obj = buildTreeCurve(root_node)
+
+    obj.location = root_point
 
     return obj
 
@@ -195,6 +214,8 @@ class MSTProperties(bpy.types.PropertyGroup):
 
     source_object = bpy.props.StringProperty(name = "Object")
     source_particle_system = bpy.props.StringProperty(name = "Object")
+
+    source_group = bpy.props.StringProperty(name = "Object group")
 
     root_data_type = bpy.props.EnumProperty(
         name = "Root data type",
@@ -321,7 +342,6 @@ class CreateDendrites(bpy.types.Operator):
         points = [(x.location[0], x.location[1], x.location[2]) for x in particle_system.particles]
 
         normals = [bpy.data.objects[options.target_object].closest_point_on_mesh(x.location)[1] for x in particle_system.particles]
-        print(normals)
 
         createMultipleTrees(points, normals, options)
 

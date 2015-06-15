@@ -150,7 +150,6 @@ def add_quad_diameter(root_node, scale = 0.5, offset = 0.5, path_scale = 1.0):
 	for terminal_node in terminal_nodes:
 		node = terminal_node
 		c = quad_coefficients[min(quad_coefficients, key=lambda x:abs(x - terminal_node.path_distance * path_scale))]
-		print(terminal_node.path_distance * path_scale, c)
 		while node is not None:
 			x = node.path_distance * path_scale
 			if not hasattr(node, 'temp_t'):
