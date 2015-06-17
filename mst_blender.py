@@ -12,6 +12,8 @@ bl_info = {
     "author": "Patrick Herbers"
 }
 
+DENDRITE_GROUP_NAME = "DENDRITE_TREES"
+
 def buildTreeMesh(root_node):
 
     def buildTreeMeshRecursive(root_node, vertex_index, vertices, edges):
@@ -178,6 +180,8 @@ def createMultipleTrees(points, normals, options = None):
     particle_system = bpy.data.objects[options.source_object].particle_systems[options.source_particle_system]
     intial_seed = particle_system.seed
 
+    objects = []
+
     for i, point in enumerate(points):
         if normals is not None:
             normal = normals[i]
@@ -196,7 +200,11 @@ def createMultipleTrees(points, normals, options = None):
         obj.rotation_mode = 'QUATERNION'
         obj.rotation_quaternion = mathutils.Vector(normal).to_track_quat('Z', 'Y')
 
+        objects.append(obj)
+
     particle_system.seed = intial_seed
+
+    return objects
 
 class MSTProperties(bpy.types.PropertyGroup):
     balancing_factor = bpy.props.FloatProperty(name = "Balancing factor", default = 0.5, min = 0.0, max = 1.0)
@@ -243,6 +251,8 @@ class MSTProperties(bpy.types.PropertyGroup):
     spin_degrees = bpy.props.FloatProperty(name = "Spin degrees", subtype = 'ANGLE', min = 0.0, max = 2*math.pi, default = math.pi)
     spin_axis = bpy.props.EnumProperty(name = "Spin axis", items = (('X', 'X', 'Spin along the X-axis of the object'), ('Y', 'Y', 'Spin along the Y-axis of the object'), ('Z', 'Z', 'Spin along the Z-axis of the object')), default = 'Y')
 
+
+class MSTDendriteProperties(bpy.types.PropertyGroup):
     target_object = bpy.props.StringProperty(name = "Target object")
     target_particle_system = bpy.props.StringProperty(name = "Target particle system")
 
@@ -303,7 +313,7 @@ class DendritePanel(bpy.types.Panel):
     bl_category = "Tools"
 
     def draw(self, context):
-        op = context.scene.mst_options
+        op = context.scene.mst_dendrite_options
 
         layout = self.layout
 
@@ -316,6 +326,9 @@ class DendritePanel(bpy.types.Panel):
 
         row = layout.row()
         row.operator("object.create_dendrites")
+
+        row = layout.row()
+        row.operator("object.delete_dendrites")
 
 
 class CreateMST(bpy.types.Operator):
@@ -335,7 +348,11 @@ class CreateDendrites(bpy.types.Operator):
     bl_label = "Create dendrites"
 
     def execute(self, context):
-        options = context.scene.mst_options
+        options = context.scene.mst_dendrite_options
+
+        if DENDRITE_GROUP_NAME not in bpy.data.groups:
+            bpy.data.groups.new(DENDRITE_GROUP_NAME)
+        group = bpy.data.groups[DENDRITE_GROUP_NAME]
 
         particle_system = bpy.data.objects[options.target_object].particle_systems[options.target_particle_system]
 
@@ -343,16 +360,36 @@ class CreateDendrites(bpy.types.Operator):
 
         normals = [bpy.data.objects[options.target_object].closest_point_on_mesh(x.location)[1] for x in particle_system.particles]
 
-        createMultipleTrees(points, normals, options)
+        trees = createMultipleTrees(points, normals, context.scene.mst_options)
+
+        # Add trees to group
+        for tree in trees:
+            group.objects.link(tree)
+
+        return {'FINISHED'}
+
+class DeleteDendrites(bpy.types.Operator):
+    bl_idname = "object.delete_dendrites"
+    bl_label = "Delete dendrites"
+
+    def execute(self, context):
+        if DENDRITE_GROUP_NAME in bpy.data.groups:
+            trees = bpy.data.groups[DENDRITE_GROUP_NAME].objects
+            for tree in trees:
+                context.scene.objects.unlink(tree)
+                bpy.data.objects.remove(tree)
 
         return {'FINISHED'}
 
 def register():
     bpy.utils.register_class(MSTProperties)
-    bpy.types.Scene.mst_options = bpy.props.PointerProperty(type=MSTProperties)
+    bpy.types.Scene.mst_options = bpy.props.PointerProperty(type = MSTProperties)
+    bpy.utils.register_class(MSTDendriteProperties)
+    bpy.types.Scene.mst_dendrite_options = bpy.props.PointerProperty(type = MSTDendriteProperties)
     bpy.utils.register_class(CreateMST)
     bpy.utils.register_class(MSTPanel)
     bpy.utils.register_class(CreateDendrites)
+    bpy.utils.register_class(DeleteDendrites)
     bpy.utils.register_class(DendritePanel)
 
 def unregister():
@@ -361,6 +398,7 @@ def unregister():
     bpy.utils.unregister_class(CreateMST)
     bpy.utils.unregister_class(MSTPanel)
     bpy.utils.unregister_class(CreateDendrites)
+    bpy.utils.unregister_class(DeleteDendrites)
     bpy.utils.unregister_class(DendritePanel)
 
 if __name__ == '__main__':
