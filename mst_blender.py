@@ -14,20 +14,15 @@ bl_info = {
 
 DENDRITE_GROUP_NAME = "DENDRITE_TREES"
 
-def buildTreeMesh(root_node):
+def buildTreeMesh(root_node, skin = False):
+    nodes = mstree.tree_to_list(root_node)
 
-    def buildTreeMeshRecursive(root_node, vertex_index, vertices, edges):
-        for child in root_node.children:
-            vertices.append(child.pos)
-            edges.append([vertex_index, len(vertices) - 1])
-            buildTreeMeshRecursive(child, len(vertices) - 1, vertices, edges)
+    vertices = [node.pos for node in nodes]
 
-    vertices = [root_node.pos]
     edges = []
-    for child in root_node.children:
-        vertices.append(child.pos)
-        edges.append([0, len(vertices) - 1])
-        buildTreeMeshRecursive(child, len(vertices) - 1, vertices, edges)
+    for i, node in enumerate(nodes):
+        if node.parent is not None:
+            edges.append([i, nodes.index(node.parent)])
 
     mesh = bpy.data.meshes.new("Tree")
     mesh.from_pydata(vertices, edges, [])
@@ -35,6 +30,13 @@ def buildTreeMesh(root_node):
 
     obj = bpy.data.objects.new("Tree", mesh)
     bpy.context.scene.objects.link(obj)
+
+    if skin:
+        obj.modifiers.new("DendriteThickness", 'SKIN')
+        obj.modifiers["DendriteThickness"].use_smooth_shade = True
+        for i, node in enumerate(nodes):
+            obj.data.skin_vertices[0].data[i].radius= (node.thickness * 0.005, node.thickness * 0.005)
+
     return obj
 
 def buildTreeCurve(root_node):
@@ -85,7 +87,6 @@ def buildTreeCurve(root_node):
     bpy.context.scene.objects.link(curve_object)
 
     curve.fill_mode = 'FULL'
-    curve.bevel_depth = 0.005
 
     return curve_object
 
@@ -156,14 +157,17 @@ def createTreeObject(options = None):
     # Create the tree structure
     root_node = mstree.mstree(points, balancing_factor = options.balancing_factor)
 
-    # Calculate the diameter of the tree
-    mstree.add_quad_diameter(root_node, path_scale = 100)
+    if options.add_thickness:
+        # Calculate the diameter of the tree
+        mstree.add_quad_diameter(root_node, scale = options.thickness_scale, offset = options.thickness_offset, path_scale = options.path_scale)
 
     # Build the blender object from the tree data
     if options.build_type == 'MESH':
-        obj = buildTreeMesh(root_node)
+        obj = buildTreeMesh(root_node, options.add_thickness)
     elif options.build_type == 'CURVE':
         obj = buildTreeCurve(root_node)
+        if options.add_thickness:
+            curve.bevel_depth = 0.005
 
     obj.location = root_point
 
@@ -251,6 +255,11 @@ class MSTProperties(bpy.types.PropertyGroup):
     spin_degrees = bpy.props.FloatProperty(name = "Spin degrees", subtype = 'ANGLE', min = 0.0, max = 2*math.pi, default = math.pi)
     spin_axis = bpy.props.EnumProperty(name = "Spin axis", items = (('X', 'X', 'Spin along the X-axis of the object'), ('Y', 'Y', 'Spin along the Y-axis of the object'), ('Z', 'Z', 'Spin along the Z-axis of the object')), default = 'Y')
 
+    add_thickness = bpy.props.BoolProperty(name = "Add thickness")
+    thickness_scale = bpy.props.FloatProperty(name = "Scale", min = 0.0, default = 1.0)
+    thickness_offset = bpy.props.FloatProperty(name = "Offset", min = 0.0, default = 0.5)
+    path_scale = bpy.props.FloatProperty(name = "Path scale", min = 0.0, default = 100.0)
+
 
 class MSTDendriteProperties(bpy.types.PropertyGroup):
     target_object = bpy.props.StringProperty(name = "Target object")
@@ -301,6 +310,19 @@ class MSTPanel(bpy.types.Panel):
 
             row = layout.row()
             row.prop(op, "spin_axis")
+
+        row = layout.row()
+        row.prop(op, "add_thickness")
+
+        if op.add_thickness:
+            row = layout.row()
+            row.prop(op, "thickness_scale")
+
+            row = layout.row()
+            row.prop(op, "thickness_offset")
+
+            row = layout.row()
+            row.prop(op, "path_scale")
 
         row = layout.row()
         row.operator("object.create_mst")
