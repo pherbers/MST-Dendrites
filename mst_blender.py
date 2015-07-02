@@ -1,16 +1,9 @@
-import mstree
+from . import mstree
 import bpy
 import numpy as np
 import mathutils
 import math
 import random
-
-bl_info = {
-    "name": "Minumum Spanning Tree",
-    "description": "Addon for creating minimum spanning trees",
-    "category": "Add Curve",
-    "author": "Patrick Herbers"
-}
 
 DENDRITE_GROUP_NAME = "DENDRITE_TREES"
 
@@ -167,7 +160,7 @@ def createTreeObject(options = None):
     elif options.build_type == 'CURVE':
         obj = buildTreeCurve(root_node)
         if options.add_thickness:
-            curve.bevel_depth = 0.005
+            obj.data.bevel_depth = 0.005
 
     obj.location = root_point
 
