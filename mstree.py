@@ -158,5 +158,5 @@ def add_quad_diameter(root_node, scale = 0.5, offset = 0.5, path_scale = 1.0):
 			node = node.parent
 
 	for node in nodes:
-		node.thickness = sum(node.temp_t) / len(node.temp_t)
+		node.thickness = sum(node.temp_t) / len(node.temp_t) + offset
 		del node.temp_t
