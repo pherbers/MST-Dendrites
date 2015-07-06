@@ -33,54 +33,39 @@ def buildTreeMesh(root_node, skin = False):
     return obj
 
 def buildTreeCurve(root_node):
-
-    def buildTreeCurveRecursive(root_node, curve, spline):
-        spline.bezier_points.add()
-        point_index = len(spline.bezier_points) - 1
-        point = spline.bezier_points[-1]
-        point.co = mathutils.Vector(root_node.pos)
-        point.handle_left_type = 'AUTO'
-        point.handle_right_type = 'AUTO'
-        if hasattr(root_node, 'thickness'):
-            point.radius = root_node.thickness
-
-        if len(root_node.children) > 0:
-            buildTreeCurveRecursive(root_node.children[0], curve, spline)
-
-        if len(root_node.children) > 1:
-            for child in root_node.children[1:]:
-                branch = curve.splines.new('BEZIER')
-                point_branch = branch.bezier_points[0]
-                point_branch.co = mathutils.Vector(root_node.pos)
-
-                buildTreeCurveRecursive(child, curve, branch)
-                branch.bezier_points[0].handle_right_type = 'VECTOR'
-                branch.bezier_points[0].handle_left_type = 'VECTOR'
-                if hasattr(root_node, 'thickness'):
-                    branch.bezier_points[0].radius = root_node.thickness
-
-            spline.bezier_points[point_index].handle_right_type = 'VECTOR'
-            spline.bezier_points[point_index].handle_left_type = 'VECTOR'
-
     curve = bpy.data.curves.new('Tree', 'CURVE')
     curve.dimensions = '3D'
-    
-    for child in root_node.children:
-        branch = curve.splines.new('BEZIER')
-        point = branch.bezier_points[0]
-        point.co = mathutils.Vector(root_node.pos)
 
-        buildTreeCurveRecursive(child, curve, branch)
-        branch.bezier_points[0].handle_right_type = 'VECTOR'
-        branch.bezier_points[0].handle_left_type = 'VECTOR'
-        if hasattr(root_node, 'thickness'):
-            branch.bezier_points[0].radius = root_node.thickness
+    nodes = mstree.tree_to_list(root_node)
+
+    curve.splines.new('BEZIER')
+    for i, node in enumerate(nodes):
+        spline = curve.splines[-1]
+        spline.bezier_points.add()
+
+        point = spline.bezier_points[-1]
+        point.co = mathutils.Vector(node.pos)
+        point.handle_left_type = 'VECTOR'
+        point.handle_right_type = 'VECTOR'
+        
+        if hasattr(node, 'thickness'):
+            point.radius = node.thickness
+        
+        if not node.children and len(nodes) > i + 1:
+            node = nodes[i+1].parent
+            curve.splines.new('BEZIER')
+            spline = curve.splines[-1]
+            point = spline.bezier_points[0]
+            point.co = mathutils.Vector(node.pos)
+            point.handle_left_type = 'VECTOR'
+            point.handle_right_type = 'VECTOR'
+            if hasattr(node, 'thickness'):
+                point.radius = node.thickness
 
     curve_object = bpy.data.objects.new("Tree", curve)
     bpy.context.scene.objects.link(curve_object)
 
     curve.fill_mode = 'FULL'
-
     return curve_object
 
 def spinPoints(points, axis, axis_direction, radians = math.pi, seed = None):
