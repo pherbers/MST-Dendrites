@@ -11,7 +11,7 @@ class Node:
 		if parent is not None:
 			parent.children.append(self)
 
-def mstree(points, balancing_factor = 0.5, threshold = 50):
+def mstree(points, balancing_factor = 0.5):
 	length = len(points)
 	dimensions = len(points[0])
 
@@ -26,14 +26,10 @@ def mstree(points, balancing_factor = 0.5, threshold = 50):
 	open_list = [x for x in range(1,length)]
 
 	# Init distance to root_point
-	threshold_squared = threshold ** 2
 	distances_squared = np.sum(np.square(points - root_point), axis = 1)
 	distances = np.empty(length)
 	for i in range(length - 1):
-		if distances_squared[i] <= threshold_squared:
-			distances[i] = np.sqrt(distances_squared[i])
-		else:
-			distances[i] = np.nan
+		distances[i] = np.sqrt(distances_squared[i])
 
 	closest_point_in_tree = np.zeros(length, dtype = np.int)
 	
@@ -41,8 +37,6 @@ def mstree(points, balancing_factor = 0.5, threshold = 50):
 
 	open_distance_list = distances.copy()[1:]
 	
-	tthreshold = threshold
-
 	while len(open_distance_list) > 0:
 		minimum_index = np.argmin(open_distance_list)
 		minimum = open_distance_list[minimum_index]
@@ -62,8 +56,6 @@ def mstree(points, balancing_factor = 0.5, threshold = 50):
 		closed_list[point_index] = node
 		# Remove from open list
 		open_distance_list = np.delete(open_distance_list, minimum_index)
-
-		tthreshold = max(tthreshold, threshold + distances[point_index])
 
 		open_points = points[open_list]
 		weighted_distance = np.sqrt(np.sum(np.square(np.subtract(open_points, location)), axis = 1)) + balancing_factor * path_distance

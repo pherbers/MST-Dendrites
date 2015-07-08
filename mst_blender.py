@@ -191,8 +191,6 @@ def createMultipleTrees(points, normals, options = None):
 class MSTProperties(bpy.types.PropertyGroup):
     balancing_factor = bpy.props.FloatProperty(name = "Balancing factor", default = 0.5, min = 0.0, max = 1.0)
 
-    threshold = bpy.props.FloatProperty(name = "Threshold", default = 50)
-
     point_data_type = bpy.props.EnumProperty(
         name = "Point data type",
         items = (
