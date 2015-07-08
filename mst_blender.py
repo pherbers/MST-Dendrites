@@ -197,20 +197,20 @@ class MSTProperties(bpy.types.PropertyGroup):
         name = "Point data type",
         items = (
             ('PARTICLE', 'Particle system', 'Use the particles of a particle system as points'),
-            ('GROUP', 'By layer', 'Use locations of objects in group as points')
+            ('GROUP', 'Group', 'Use locations of objects in group as points')
         ),
         default = 'PARTICLE'
     )
 
     source_object = bpy.props.StringProperty(name = "Object")
-    source_particle_system = bpy.props.StringProperty(name = "Object")
+    source_particle_system = bpy.props.StringProperty(name = "Particle System")
 
     source_group = bpy.props.StringProperty(name = "Object group")
 
     root_data_type = bpy.props.EnumProperty(
         name = "Root data type",
         items = (
-            ('PARTICLE', 'First Particle', 'Use the first particle in particle system as root point'),
+            ('PARTICLE', 'First Particle/Object', 'Use the first particle in particle system as root point'),
             ('CURSOR', '3D cursor', 'Use 3D cursor location as root point'),
             ('OBJECT', 'Object center', 'Use an object center as root point')
         ),
@@ -261,10 +261,14 @@ class MSTPanel(bpy.types.Panel):
         row = layout.row()
         row.prop(op, "point_data_type")
         row = layout.row()
-        row.prop_search(op, "source_object", bpy.data, 'objects')
-        row = layout.row()
-        if op.source_object in bpy.data.objects:
-            row.prop_search(op, "source_particle_system", bpy.data.objects[op.source_object], 'particle_systems')
+        
+        if op.point_data_type == 'PARTICLE':
+            row.prop_search(op, "source_object", bpy.data, 'objects')
+            if op.source_object in bpy.data.objects:
+                row = layout.row()
+                row.prop_search(op, "source_particle_system", bpy.data.objects[op.source_object], 'particle_systems')
+        elif op.point_data_type == 'GROUP':
+            row.prop_search(op, "source_group", bpy.data, 'groups')
 
         row = layout.row()
         row.prop(op, "root_data_type")
@@ -284,10 +288,10 @@ class MSTPanel(bpy.types.Panel):
             row.prop_search(op, "spin_object", bpy.data, 'objects')
 
             row = layout.row()
-            row.prop(op, "spin_degrees")
+            row.prop(op, "spin_axis")
 
             row = layout.row()
-            row.prop(op, "spin_axis")
+            row.prop(op, "spin_degrees")
 
         row = layout.row()
         row.prop(op, "add_thickness")
