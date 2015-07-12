@@ -1,4 +1,4 @@
-import mstree
+from . import mstree
 
 def add_quad_diameter(root_node, scale = 0.5, offset = 0.5, path_scale = 1.0):
 
