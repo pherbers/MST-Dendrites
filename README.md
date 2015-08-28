@@ -1,5 +1,5 @@
 # MST-Dendrites
-Realistic artificial dendrites using minimum spanning trees and Blender 3D. A short tutorial on how to use it can be found [here](https://youtu.be/yTYr22yE2OQ).
+Realistic artificial dendrites using minimum spanning trees and Blender 3D. A short tutorial on how to use it can be found [here](https://www.youtube.com/watch?v=18Us4noy6z8).
 
 ## mstree.py
 mstree.py gives access to functions for creating minimum spanning trees with balancing factor. The work is based on [a paper for synthetic neuronal structures](http://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1000877) by Hermann Cuntz.
