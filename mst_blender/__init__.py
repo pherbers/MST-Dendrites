@@ -1,14 +1,16 @@
 from . import mst_blender
+import bpy
 
 bl_info = {
     "name": "Minimum Spanning Tree (MST)",
     "description": "Addon for creating minimum spanning trees",
     "category": "Add Curve",
-    "author": "Patrick Herbers"
+    "author": "Patrick Herbers",
+    "blender": (2, 80, 0),
 }
 
-def register():
-	mst_blender.register()
+classes = (
+	mst_blender.OBJECT_OT_mstadd,
+)
 
-def unregister():
-	mst_blender.unregister()
+register, unregister = bpy.utils.register_classes_factory(classes)
