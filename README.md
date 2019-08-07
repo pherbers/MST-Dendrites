@@ -7,7 +7,8 @@ Given a set of points, the algorithm calculates a minimum spanning tree on them.
 
 ## Blender Addon
 mst_blender is an addon for [Blender 3D](blender.org) to create minimum spanning trees directly in Blender.
-To install, copy the mst_blender folder into your Blender script directory (minimum Blender version 2.70). 
+To install, copy the mst_blender folder into your Blender script directory (minimum Blender version 2.70/2.80). 
 Two new GUI-Panels will show up in your Tools panel, where you can adjust settings for your MST.
+As of Blender 2.80, you will find the operators in `Add->Mesh->Minimum Spanning Tree`.
 
 This addon was mainly developed to create Dendritic structures in Blender as a bachelor thesis, but it can be used to just create minimum spanning trees when using a balancing factor of 0.
