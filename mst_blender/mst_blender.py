@@ -131,7 +131,7 @@ def createTreeObject(options = None):
         else:
             up_axis = mathutils.Vector((1.0, 0.0, 0.0))
 
-        axis = bpy.data.objects[options.spin_object].rotation_euler.to_matrix() * up_axis
+        axis = bpy.data.objects[options.spin_object].rotation_euler.to_matrix() @ up_axis
         location = bpy.data.objects[options.spin_object].location - root_point
 
         points = spinPoints(points, np.array(location), np.array(axis), options.spin_degrees, seed)
@@ -253,6 +253,7 @@ class OBJECT_OT_mstadd(bpy.types.Operator):
         if ao is not None:
             self.source_object = ao.name
             self.root_data_object = ao.name
+            self.spin_object = ao.name
             if len(ao.particle_systems):
                 self.source_particle_system = context.active_object.particle_systems[0].name
         wm = context.window_manager
