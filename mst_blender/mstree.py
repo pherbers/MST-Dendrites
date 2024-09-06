@@ -31,7 +31,7 @@ def mstree(points, balancing_factor = 0.5):
 	for i in range(length - 1):
 		distances[i] = np.sqrt(distances_squared[i])
 
-	closest_point_in_tree = np.zeros(length, dtype = np.int)
+	closest_point_in_tree = np.zeros(length, dtype = int)
 	
 	distances = np.sqrt(distances_squared)
 
@@ -61,7 +61,7 @@ def mstree(points, balancing_factor = 0.5):
 		weighted_distance = np.sqrt(np.sum(np.square(np.subtract(open_points, location)), axis = 1)) + balancing_factor * path_distance
 		open_distance_list_indeces = np.argmin(np.column_stack((open_distance_list, weighted_distance)), axis = 1)
 		open_distance_list = np.minimum(open_distance_list, weighted_distance)
-		changed_values = np.zeros(len(closest_point_in_tree), dtype = np.bool)
+		changed_values = np.zeros(len(closest_point_in_tree), dtype = bool)
 		changed_values.put(open_list, open_distance_list_indeces)
 		closest_point_in_tree = np.where(changed_values == 1, point_index, closest_point_in_tree)
 
